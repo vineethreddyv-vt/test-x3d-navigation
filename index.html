@@ -3,9 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <title>X3D Shape Toggle Test</title>
-    <script
-      src="./x3dom.js"
-    ></script>
+    <script type="text/javascript" src="./x3dom.js"></script>
     <link
       rel="stylesheet"
       type="text/css"
@@ -76,34 +74,16 @@
         shapeTorusBtn: false,
       };
 
-      var transMat = new x3dom.fields.SFMatrix4f();
-      var rotMat = new x3dom.fields.SFMatrix4f();
-      var axes = [0, 0];
-
-      const speed = Math.PI; // Speed to control how fast joystick affects the angle
-
       function updateViewpoint(viewarea, leftController) {
         var d = viewarea._scene._lastMax
           .subtract(viewarea._scene._lastMin)
           .length();
         d = d < x3dom.fields.Eps ? 1 : d;
 
-        // Define movement speed and rotation factors
-        const moveSpeed = 0.05 * d;
         const rotateSpeed = 0.02;
 
-        // Extract joystick values from leftController
-        const panX = leftController.axes[0] * moveSpeed;
-        const panY = leftController.axes[1] * moveSpeed;
         const rotateYaw = leftController.axes[2] * rotateSpeed;
         const rotatePitch = leftController.axes[3] * rotateSpeed;
-
-        // Update translation based on pan movement
-        const translation = new x3dom.fields.SFVec3f(panX, panY, 0);
-        viewarea._movement = viewarea._movement.add(translation);
-        viewarea._transMat = x3dom.fields.SFMatrix4f.translation(
-          viewarea._movement
-        );
 
         // Update rotation based on yaw and pitch from the joystick
         viewarea._yaw += rotateYaw;
@@ -126,6 +106,7 @@
           viewarea.vrRightViewMatrix = newViewMatrix;
         }
       }
+
       // Function to update the controller state and apply actions
       function updateControllerState(buttons) {
         if (controllerButtonState.button4 && !buttons[4].pressed) {
@@ -153,21 +134,27 @@
         controllerButtonState.button5 = buttons[5].pressed;
       }
 
-      // x3dom.VRControllerManager.prototype.update = function (
-      //   viewarea,
-      //   vrFrameData
-      // ) {
-      //   if (!vrFrameData) return;
+      const originalUpdate = x3dom.VRControllerManager.prototype.update;
 
-      //   const controllers = vrFrameData.controllers;
-      //   const leftController = controllers.left
-      //     ? controllers.left.gamepad
-      //     : null;
-      //   if (!leftController) return;
+      // Redefine the update method to add custom functionality
+      x3dom.VRControllerManager.prototype.update = function (
+        viewarea,
+        vrFrameData
+      ) {
+        // Call the original update method
+        originalUpdate.call(this, viewarea, vrFrameData);
 
-      //   updateViewpoint(viewarea, leftController);
-      //   updateControllerState(leftController.buttons);
-      // };
+        if (vrFrameData) {
+          const controllers = vrFrameData.controllers;
+          const leftController = controllers.left
+            ? controllers.left.gamepad
+            : null;
+          if (leftController) {
+            updateViewpoint(viewarea, leftController);
+            updateControllerState(leftController.buttons);
+          }
+        }
+      };
 
       // Function to toggle visibility of shapes when triggered by button events
       function toggleVisibility(buttonId, x3dSwId) {
