@@ -1,1 +1,304 @@
-<h1>Hello</h1>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>X3D Shape Toggle Test</title>
+    <script
+      type="text/javascript"
+      src="https://www.x3dom.org/download/x3dom.js"
+    ></script>
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://www.x3dom.org/download/x3dom.css"
+    />
+    <style>
+      body {
+        background-color: #54596d;
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        height: 100vh;
+        overflow: hidden;
+        color: white;
+      }
+      .full-body {
+        position: relative;
+        width: 100%;
+        height: 100%;
+      }
+      .x3d-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #333;
+        z-index: 1;
+      }
+      .controls {
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        background-color: #11182740;
+        position: absolute;
+        right: 0;
+        top: 10%;
+        z-index: 2;
+        width: 200px;
+      }
+      .controls button {
+        background-color: #666;
+        border: none;
+        color: white;
+        font-size: large;
+        margin-bottom: 5px;
+        padding: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s, transform 0.3s;
+      }
+      .controls button:hover {
+        background-color: #888;
+        transform: scale(1.05);
+      }
+      .controls button.active {
+        background-color: #4a5b9b;
+      }
+    </style>
+
+    <script>
+      // Track the last known state of each controller button to detect releases
+      const controllerButtonState = { button4: false, button5: false };
+      const visibilityState = {
+        shapeBoxBtn: false,
+        shapeSphereBtn: false,
+        shapeCylinderBtn: false,
+        shapeConeBtn: false,
+        shapeTorusBtn: false,
+      };
+
+      var transMat = new x3dom.fields.SFMatrix4f();
+      var rotMat = new x3dom.fields.SFMatrix4f();
+      var axes = [0, 0];
+
+      const speed = Math.PI; // Speed to control how fast joystick affects the angle
+
+      function updateViewpoint(viewarea, leftController) {
+        var d = viewarea._scene._lastMax
+          .subtract(viewarea._scene._lastMin)
+          .length();
+        d = d < x3dom.fields.Eps ? 1 : d;
+
+        // Define movement speed and rotation factors
+        const moveSpeed = 0.05 * d;
+        const rotateSpeed = 0.02;
+
+        // Extract joystick values from leftController
+        const panX = leftController.axes[0] * moveSpeed;
+        const panY = leftController.axes[1] * moveSpeed;
+        const rotateYaw = leftController.axes[2] * rotateSpeed;
+        const rotatePitch = leftController.axes[3] * rotateSpeed;
+
+        // Update translation based on pan movement
+        const translation = new x3dom.fields.SFVec3f(panX, panY, 0);
+        viewarea._movement = viewarea._movement.add(translation);
+        viewarea._transMat = x3dom.fields.SFMatrix4f.translation(
+          viewarea._movement
+        );
+
+        // Update rotation based on yaw and pitch from the joystick
+        viewarea._yaw += rotateYaw;
+        viewarea._pitch += rotatePitch;
+
+        // Create rotation matrices for yaw (Y-axis) and pitch (X-axis)
+        const yawMat = x3dom.fields.SFMatrix4f.rotationY(viewarea._yaw);
+        const pitchMat = x3dom.fields.SFMatrix4f.rotationX(viewarea._pitch);
+        viewarea._rotMat = yawMat.mult(pitchMat);
+
+        // Combine translation and rotation to get the new view matrix
+        const viewpointMatrix = viewarea.getViewpointMatrix();
+        const newViewMatrix = viewpointMatrix
+          .mult(viewarea._transMat)
+          .mult(viewarea._rotMat);
+
+        // Apply the new view matrix to VR view matrices if in VR mode
+        if (viewarea.vrFrameData) {
+          viewarea.vrLeftViewMatrix = newViewMatrix;
+          viewarea.vrRightViewMatrix = newViewMatrix;
+        }
+      }
+      // Function to update the controller state and apply actions
+      function updateControllerState(buttons) {
+        if (controllerButtonState.button4 && !buttons[4].pressed) {
+          for (const buttonId in visibilityState) {
+            if (!visibilityState[buttonId]) {
+              document.getElementById(buttonId).click();
+              break;
+            }
+          }
+        }
+
+        // Button 5 (Remove Layer) - Trigger on release
+        if (controllerButtonState.button5 && !buttons[5].pressed) {
+          const visibleButtons = Object.keys(visibilityState).filter(
+            (id) => visibilityState[id]
+          );
+          if (visibleButtons.length > 0) {
+            const lastVisibleButton = visibleButtons[visibleButtons.length - 1];
+            document.getElementById(lastVisibleButton).click();
+          }
+        }
+
+        // Update button states to current frame's state
+        controllerButtonState.button4 = buttons[4].pressed;
+        controllerButtonState.button5 = buttons[5].pressed;
+      }
+
+      x3dom.VRControllerManager.prototype.update = function (
+        viewarea,
+        vrFrameData
+      ) {
+        if (!vrFrameData) return;
+
+        const controllers = vrFrameData.controllers;
+        const leftController = controllers.left
+          ? controllers.left.gamepad
+          : null;
+        if (!leftController) return;
+
+        updateViewpoint(viewarea, leftController);
+        updateControllerState(leftController.buttons);
+      };
+
+      // Function to toggle visibility of shapes when triggered by button events
+      function toggleVisibility(buttonId, x3dSwId) {
+        const button = document.getElementById(buttonId);
+        const switchNode = document.getElementById(x3dSwId);
+        const isVisible = visibilityState[buttonId];
+
+        if (isVisible) {
+          switchNode.whichChoice = -1; // Hide
+          visibilityState[buttonId] = false;
+          button.classList.remove("active");
+        } else {
+          switchNode.whichChoice = 0; // Show
+          visibilityState[buttonId] = true;
+          button.classList.add("active");
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="full-body">
+      <div class="x3d-container">
+        <x3d width="100%" height="100%">
+          <scene>
+            <Viewpoint
+              id="mainViewpoint"
+              position="0 0 10"
+              description="User View"
+            ></Viewpoint>
+
+            <!-- Switch with Box -->
+            <transform translation="0 0 0">
+              <switch id="shapeBoxSw" whichChoice="-1">
+                <shape>
+                  <box size="2 2 2"></box>
+                  <appearance>
+                    <material diffuseColor="1 0 0"></material>
+                  </appearance>
+                </shape>
+              </switch>
+            </transform>
+
+            <!-- Switch with Sphere -->
+            <transform translation="3 0 0">
+              <switch id="shapeSphereSw" whichChoice="-1">
+                <shape>
+                  <sphere radius="1.5"></sphere>
+                  <appearance>
+                    <material diffuseColor="0 1 0"></material>
+                  </appearance>
+                </shape>
+              </switch>
+            </transform>
+
+            <!-- Switch with Cylinder -->
+            <transform translation="-3 0 0">
+              <switch id="shapeCylinderSw" whichChoice="-1">
+                <shape>
+                  <cylinder height="3" radius="1"></cylinder>
+                  <appearance>
+                    <material diffuseColor="0 0 1"></material>
+                  </appearance>
+                </shape>
+              </switch>
+            </transform>
+
+            <!-- Switch with Cone -->
+            <transform translation="0 3 0">
+              <switch id="shapeConeSw" whichChoice="-1">
+                <shape>
+                  <cone height="3" bottomRadius="1"></cone>
+                  <appearance>
+                    <material diffuseColor="1 1 0"></material>
+                  </appearance>
+                </shape>
+              </switch>
+            </transform>
+
+            <!-- Switch with Torus (Approximated with Extrusion) -->
+            <transform translation="0 -3 0">
+              <switch id="shapeTorusSw" whichChoice="-1">
+                <shape>
+                  <extrusion
+                    crossSection="1 0, 0.707 0.707, 0 1, -0.707 0.707, -1 0, -0.707 -0.707, 0 -1, 0.707 -0.707, 1 0"
+                    spine="0 0 0, 0 0 0.5, 0 0 1, 0 0 1.5, 0 0 2"
+                  >
+                  </extrusion>
+                  <appearance>
+                    <material diffuseColor="1 0.5 0"></material>
+                  </appearance>
+                </shape>
+              </switch>
+            </transform>
+          </scene>
+        </x3d>
+      </div>
+
+      <!-- Control Panel for Adding and Removing Shapes -->
+      <div class="controls">
+        <button
+          id="shapeBoxBtn"
+          onclick="toggleVisibility('shapeBoxBtn', 'shapeBoxSw')"
+        >
+          Toggle Box
+        </button>
+        <button
+          id="shapeSphereBtn"
+          onclick="toggleVisibility('shapeSphereBtn', 'shapeSphereSw')"
+        >
+          Toggle Sphere
+        </button>
+        <button
+          id="shapeCylinderBtn"
+          onclick="toggleVisibility('shapeCylinderBtn', 'shapeCylinderSw')"
+        >
+          Toggle Cylinder
+        </button>
+        <button
+          id="shapeConeBtn"
+          onclick="toggleVisibility('shapeConeBtn', 'shapeConeSw')"
+        >
+          Toggle Cone
+        </button>
+        <button
+          id="shapeTorusBtn"
+          onclick="toggleVisibility('shapeTorusBtn', 'shapeTorusSw')"
+        >
+          Toggle Torus
+        </button>
+      </div>
+    </div>
+  </body>
+</html>
