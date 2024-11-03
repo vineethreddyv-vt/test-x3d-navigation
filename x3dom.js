@@ -19267,7 +19267,7 @@ function setNamespace(e, t, i) {
           offset: new x3dom.fields.SFVec3f(0.2, -0.3, -0.3),
           axesScale: [-1, 1],
         },
-        "meta-quest-touch-plus": {
+        "meta-quest-touch-pro": {
           left: "https://x3dom.org/download/assets/vr/oculus-go.glb",
           right: "https://x3dom.org/download/assets/vr/oculus-go.glb",
           scaleFactor: new x3dom.fields.SFVec3f(1, 1, 1),
