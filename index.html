@@ -153,21 +153,21 @@
         controllerButtonState.button5 = buttons[5].pressed;
       }
 
-      x3dom.VRControllerManager.prototype.update = function (
-        viewarea,
-        vrFrameData
-      ) {
-        if (!vrFrameData) return;
+      // x3dom.VRControllerManager.prototype.update = function (
+      //   viewarea,
+      //   vrFrameData
+      // ) {
+      //   if (!vrFrameData) return;
 
-        const controllers = vrFrameData.controllers;
-        const leftController = controllers.left
-          ? controllers.left.gamepad
-          : null;
-        if (!leftController) return;
+      //   const controllers = vrFrameData.controllers;
+      //   const leftController = controllers.left
+      //     ? controllers.left.gamepad
+      //     : null;
+      //   if (!leftController) return;
 
-        updateViewpoint(viewarea, leftController);
-        updateControllerState(leftController.buttons);
-      };
+      //   updateViewpoint(viewarea, leftController);
+      //   updateControllerState(leftController.buttons);
+      // };
 
       // Function to toggle visibility of shapes when triggered by button events
       function toggleVisibility(buttonId, x3dSwId) {
