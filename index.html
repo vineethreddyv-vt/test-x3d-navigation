@@ -150,10 +150,101 @@
             ? controllers.left.gamepad
             : null;
           if (leftController) {
-            updateViewpoint(viewarea, leftController);
+            //updateViewpoint(viewarea, leftController);
             updateControllerState(leftController.buttons);
           }
         }
+      };
+
+      x3dom.VRControllerManager.prototype._updateMatrices = function (
+        viewarea,
+        controllers
+      ) {
+        var transMat = new x3dom.fields.SFMatrix4f();
+        var rotMat = new x3dom.fields.SFMatrix4f();
+        var axes = [0, 0];
+
+        // Handle the left controller input
+        if (controllers.left) {
+          var axesScale = this._getControllerAxesScale(controllers.left.type);
+          axes[0] += controllers.left.gamepad.axes[0] * axesScale[0];
+          axes[1] += controllers.left.gamepad.axes[1] * axesScale[1];
+
+          if (controllers.left.gamepad.buttons[0].pressed) {
+            const pose = controllers.left.pose;
+            const cDirection = this._getControllerDirection(pose);
+            const scaleFactor = this._getViewAreaZoom(viewarea);
+            viewarea._movement = viewarea._movement.add(
+              cDirection.multiply(scaleFactor)
+            );
+          }
+
+          // Incorporate updateViewpoint's yaw and pitch rotation logic
+          const rotateSpeed = 0.02;
+          const rotateYaw = controllers.left.gamepad.axes[2] * rotateSpeed;
+          const rotatePitch = controllers.left.gamepad.axes[3] * rotateSpeed;
+
+          viewarea._yaw += rotateYaw;
+          viewarea._pitch += rotatePitch;
+
+          // Create rotation matrices for yaw (Y-axis) and pitch (X-axis)
+          const yawMat = x3dom.fields.SFMatrix4f.rotationY(viewarea._yaw);
+          const pitchMat = x3dom.fields.SFMatrix4f.rotationX(viewarea._pitch);
+
+          // Combine the yaw and pitch rotation into a single rotation matrix
+          viewarea._rotMat = yawMat.mult(pitchMat);
+        }
+
+        // Handle the right controller input
+        if (controllers.right) {
+          var axesScale = this._getControllerAxesScale(controllers.right.type);
+          axes[0] += controllers.right.gamepad.axes[0] * axesScale[0];
+          axes[1] += controllers.right.gamepad.axes[1] * axesScale[1];
+
+          if (controllers.right.gamepad.buttons[0].pressed) {
+            const pose = controllers.right.pose;
+            const cDirection = this._getControllerDirection(pose);
+            const scaleFactor = this._getViewAreaZoom(viewarea);
+            viewarea._movement = viewarea._movement.add(
+              cDirection.multiply(scaleFactor)
+            );
+          }
+        }
+
+        // Calculate directional movement based on axes input
+        var dx = axes[0] * 5;
+        var dy = axes[1] * 5;
+
+        var viewDir = viewarea.vrLeftViewMatrix.e2();
+        var rightDir = viewarea.vrLeftViewMatrix.e0();
+
+        var d = viewarea._scene._lastMax
+          .subtract(viewarea._scene._lastMin)
+          .length();
+        d = d < x3dom.fields.Eps ? 1 : d;
+
+        viewDir = new x3dom.fields.SFVec3f(
+          -viewDir.x,
+          -viewDir.y,
+          viewDir.z
+        ).multiply(d * (dy / viewarea._height));
+        rightDir = new x3dom.fields.SFVec3f(
+          -rightDir.x,
+          -rightDir.y,
+          rightDir.z
+        ).multiply(d * (dx / viewarea._width));
+
+        viewarea._movement = viewarea._movement.add(rightDir).add(viewDir);
+        transMat = x3dom.fields.SFMatrix4f.translation(viewarea._movement);
+
+        // Combine the translation and rotation matrices
+        const combinedMatrix = transMat.mult(viewarea._rotMat).mult(rotMat);
+
+        // Apply the combined transformation to VR view matrices
+        viewarea.vrLeftViewMatrix =
+          viewarea.vrLeftViewMatrix.mult(combinedMatrix);
+        viewarea.vrRightViewMatrix =
+          viewarea.vrRightViewMatrix.mult(combinedMatrix);
       };
 
       // Function to toggle visibility of shapes when triggered by button events
